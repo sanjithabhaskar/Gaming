@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Neon Racer</title>
+    <style>
+        body {
+            background-color: #0c0c18;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        h1 {
+            margin: 0 0 5px 0;
+            font-size: 20px;
+            color: #00c8ff;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 200, 255, 0.4);
+        }
+        #canvas-container {
+            border: 3px solid #00c8ff;
+            border-radius: 12px;
+            box-shadow: 0 0 25px rgba(0, 200, 255, 0.3);
+            overflow: hidden;
+            background: #1e1e2d;
+        }
+        canvas {
+            display: block;
+        }
+        .controls {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>PYTHON NEON RACER</h1>
+    <div id="canvas-container">
+        <canvas id="gameCanvas" width="480" height="660"></canvas>
+    </div>
+    <div class="controls">
+        Controls: <b>Left / Right Arrows</b> to Switch Lanes | <b>R</b> to Restart
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        const WIDTH = canvas.width;
+        const HEIGHT = canvas.height;
+
+        const lanes = [120, 240, 360];
+        let lane = 1;
+        let score = 0;
+        let speed = 5;
+        let boost = false;
+        let boostTimer = 0;
+        let lives = 3;
+        let gameOver = false;
+
+        let playerWidth = 38;
+        let playerHeight = 65;
+        let playerY = HEIGHT - 100;
+
+        let traffic = [];
+        let boostPads = [];
+
+        function spawnObstacle() {
+            let laneIdx = Math.floor(Math.random() * 3);
+            let yPos = Math.random() * -400 - 100;
+            if (Math.random() < 0.25) {
+                boostPads.push({ lane: laneIdx, y: yPos });
+            } else {
+                traffic.push({
+                    lane: laneIdx,
+                    y: yPos,
+                    color: Math.random() < 0.5 ? "#ff3250" : "#9600ff"
+                });
+            }
+        }
+
+        for (let i = 0; i < 3; i++) {
+            spawnObstacle();
+        }
+
+        let keys = {};
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'ArrowLeft' && lane > 0 && !gameOver) {
+                lane--;
+            }
+            if (e.code === 'ArrowRight' && lane < 2 && !gameOver) {
+                lane++;
+            }
+            if (e.code === 'KeyR' && gameOver) {
+                lane = 1;
+                score = 0;
+                speed = 5;
+                boost = false;
+                lives = 3;
+                traffic = [];
+                boostPads = [];
+                for (let i = 0; i < 3; i++) spawnObstacle();
+                gameOver = false;
+            }
+        });
+
+        function update() {
+            if (gameOver) return;
+
+            let currentSpeed = speed;
+            if (boost) {
+                currentSpeed = speed * 2;
+                boostTimer--;
+                if (boostTimer <= 0) boost = false;
+            }
+
+            score += Math.floor(currentSpeed / 3);
+
+            // Update traffic
+            for (let i = traffic.length - 1; i >= 0; i--) {
+                traffic[i].y += currentSpeed;
+                if (traffic[i].y > HEIGHT) {
+                    traffic.splice(i, 1);
+                    spawnObstacle();
+                } else {
+                    // Collision check
+                    let pX = lanes[lane] - playerWidth / 2;
+                    let cX = lanes[traffic[i].lane] - playerWidth / 2;
+                    if (pX < cX + playerWidth && pX + playerWidth > cX &&
+                        playerY < traffic[i].y + playerHeight && playerY + playerHeight > traffic[i].y) {
+                        lives--;
+                        traffic.splice(i, 1);
+                        spawnObstacle();
+                        if (lives <= 0) gameOver = true;
+                    }
+                }
+            }
+
+            // Update boost pads
+            for (let i = boostPads.length - 1; i >= 0; i--) {
+                boostPads[i].y += currentSpeed;
+                if (boostPads[i].y > HEIGHT) {
+                    boostPads.splice(i, 1);
+                    spawnObstacle();
+                } else {
+                    let pX = lanes[lane] - playerWidth / 2;
+                    let bX = lanes[boostPads[i].lane] - 20;
+                    if (pX < bX + 40 && pX + playerWidth > bX &&
+                        playerY < boostPads[i].y + 25 && playerY + playerHeight > boostPads[i].y) {
+                        boost = true;
+                        boostTimer = 60;
+                        boostPads.splice(i, 1);
+                        spawnObstacle();
+                    }
+                }
+            }
+        }
+
+        function draw() {
+            // Road background
+            ctx.fillStyle = "#1a1a26";
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            ctx.fillStyle = "#28283c";
+            ctx.fillRect(60, 0, WIDTH - 120, HEIGHT);
+
+            // Lane markers
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 2;
+            ctx.setLineDash([20, 20]);
+            ctx.beginPath();
+            ctx.moveTo(180, 0); ctx.lineTo(180, HEIGHT);
+            ctx.moveTo(300, 0); ctx.lineTo(300, HEIGHT);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw Boost Pads
+            for (let pad of boostPads) {
+                ctx.fillStyle = "#ffdc00";
+                ctx.beginPath();
+                ctx.moveTo(lanes[pad.lane], pad.y);
+                ctx.lineTo(lanes[pad.lane] - 18, pad.y + 24);
+                ctx.lineTo(lanes[pad.lane] + 18, pad.y + 24);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // Draw Traffic Cars
+            for (let car of traffic) {
+                ctx.fillStyle = car.color;
+                ctx.fillRect(lanes[car.lane] - playerWidth / 2, car.y, playerWidth, playerHeight);
+            }
+
+            // Draw Player Car
+            ctx.fillStyle = "#00c8ff";
+            ctx.fillRect(lanes[lane] - playerWidth / 2, playerY, playerWidth, playerHeight);
+
+            // UI Text
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 15px monospace";
+            ctx.fillText(`SCORE: ${score}`, 25, 30);
+            ctx.fillText(`SPEED: ${Math.floor((boost ? speed * 2 : speed) * 10)}`, WIDTH - 140, 30);
+
+            if (boost) {
+                ctx.fillStyle = "#ffdc00";
+                ctx.font = "bold 22px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText("BOOST x2", WIDTH / 2, 65);
+                ctx.textAlign = "left";
+            }
+
+            if (gameOver) {
+                ctx.fillStyle = "rgba(12, 12, 24, 0.85)";
+                ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+                ctx.fillStyle = "#ff3250";
+                ctx.font = "bold 28px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText("GAME OVER", WIDTH / 2, HEIGHT / 2 - 20);
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 16px monospace";
+                ctx.fillText("Press 'R' to Restart", WIDTH / 2, HEIGHT / 2 + 25);
+                ctx.textAlign = "left";
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        loop();
+    </script>
+</body>
+</html>
