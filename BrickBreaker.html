@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Brick Breaker</title>
+    <style>
+        body {
+            background-color: #0b0b16;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        h1 {
+            margin: 0 0 5px 0;
+            font-size: 20px;
+            color: #00f0ff;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+        }
+        #canvas-container {
+            border: 3px solid #00f0ff;
+            border-radius: 12px;
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.3);
+            overflow: hidden;
+            background: #07070f;
+        }
+        canvas {
+            display: block;
+        }
+        .controls {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>PYTHON BRICK BREAKER</h1>
+    <div id="canvas-container">
+        <canvas id="gameCanvas" width="480" height="640"></canvas>
+    </div>
+    <div class="controls">
+        Controls: <b>A / D</b> or <b>Left / Right Arrows</b> to Move | <b>R</b> to Restart
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        const WIDTH = canvas.width;
+        const HEIGHT = canvas.height;
+
+        let score = 0;
+        let combo = 0;
+        let lives = 3;
+        let gameOver = false;
+        let multiballActive = false;
+
+        let paddle = {
+            x: WIDTH / 2 - 50,
+            y: HEIGHT - 45,
+            width: 100,
+            height: 14,
+            speed: 8
+        };
+
+        let balls = [{
+            x: WIDTH / 2,
+            y: HEIGHT - 70,
+            dx: 3,
+            dy: -4,
+            radius: 8
+        }];
+
+        let bricks = [];
+        const colors = ["#ff3250", "#ffb432", "#32dc96", "#3296ff"];
+
+        function initBricks() {
+            bricks = [];
+            let rows = 4;
+            let cols = 6;
+            let bw = 64;
+            let bh = 22;
+            let pad = 10;
+            let offsetTop = 60;
+            let offsetLeft = 35;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    bricks.push({
+                        x: offsetLeft + c * (bw + pad),
+                        y: offsetTop + r * (bh + pad),
+                        width: bw,
+                        height: bh,
+                        color: colors[r % colors.length],
+                        status: 1
+                    });
+                }
+            }
+        }
+
+        initBricks();
+
+        let keys = {};
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (e.code === 'KeyR' && gameOver) {
+                resetGame();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        function resetGame() {
+            score = 0;
+            combo = 0;
+            lives = 3;
+            gameOver = false;
+            multiballActive = false;
+            initBricks();
+            resetBalls();
+        }
+
+        function resetBalls() {
+            balls = [{
+                x: paddle.x + paddle.width / 2,
+                y: paddle.y - 15,
+                dx: 3,
+                dy: -4,
+                radius: 8
+            }];
+        }
+
+        function update() {
+            if (gameOver) return;
+
+            if ((keys['ArrowLeft'] || keys['KeyA']) && paddle.x > 15) {
+                paddle.x -= paddle.speed;
+            }
+            if ((keys['ArrowRight'] || keys['KeyD']) && paddle.x < WIDTH - paddle.width - 15) {
+                paddle.x += paddle.speed;
+            }
+
+            for (let i = balls.length - 1; i >= 0; i--) {
+                let b = balls[i];
+                b.x += b.dx;
+                b.y += b.dy;
+
+                // Wall bounds
+                if (b.x - b.radius < 15 || b.x + b.radius > WIDTH - 15) {
+                    b.dx *= -1;
+                }
+                if (b.y - b.radius < 50) {
+                    b.dy *= -1;
+                }
+
+                // Floor (lose life)
+                if (b.y > HEIGHT) {
+                    balls.splice(i, 1);
+                    if (balls.length === 0) {
+                        lives--;
+                        combo = 0;
+                        if (lives <= 0) {
+                            gameOver = true;
+                        } else {
+                            resetBalls();
+                        }
+                    }
+                    break;
+                }
+
+                // Paddle collision
+                if (b.y + b.radius >= paddle.y && b.x >= paddle.x && b.x <= paddle.x + paddle.width && b.dy > 0) {
+                    b.dy = -Math.abs(b.dy);
+                    let hitPoint = b.x - (paddle.x + paddle.width / 2);
+                    b.dx = hitPoint * 0.12;
+                }
+
+                // Brick collisions
+                for (let brick of bricks) {
+                    if (brick.status === 1) {
+                        if (b.x > brick.x && b.x < brick.x + brick.width && b.y > brick.y && b.y < brick.y + brick.height) {
+                            b.dy *= -1;
+                            brick.status = 0;
+                            score += 10;
+                            combo++;
+
+                            // Trigger Multiball randomly
+                            if (Math.random() < 0.25 && !multiballActive && balls.length < 3) {
+                                multiballActive = true;
+                                balls.push({
+                                    x: b.x,
+                                    y: b.y,
+                                    dx: -b.dx,
+                                    dy: b.dy,
+                                    radius: 8
+                                });
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Check win / clear board
+            if (bricks.every(b => b.status === 0)) {
+                initBricks();
+                resetBalls();
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = "#07070f";
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            // Frame border
+            ctx.strokeStyle = "#00f0ff";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(15, 15, WIDTH - 30, HEIGHT - 30);
+
+            // Bricks
+            for (let brick of bricks) {
+                if (brick.status === 1) {
+                    ctx.fillStyle = brick.color;
+                    ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
+                }
+            }
+
+            // Paddle
+            ctx.fillStyle = "#00f0ff";
+            ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+
+            // Balls
+            ctx.fillStyle = "#ff3296";
+            for (let b of balls) {
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // UI Texts
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 15px monospace";
+            ctx.fillText(`SCORE: ${score}`, 30, 38);
+            ctx.fillText(`COMBO: ${combo}`, WIDTH - 140, 38);
+
+            if (multiballActive && !gameOver) {
+                ctx.fillStyle = "#ff3296";
+                ctx.font = "bold 20px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText("MULTIBALL ACTIVE", WIDTH / 2, HEIGHT / 2 - 40);
+                ctx.textAlign = "left";
+            }
+
+            if (gameOver) {
+                ctx.fillStyle = "rgba(7, 7, 15, 0.85)";
+                ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+                ctx.fillStyle = "#ff3250";
+                ctx.font = "bold 32px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText("GAME OVER", WIDTH / 2, HEIGHT / 2 - 20);
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 16px monospace";
+                ctx.fillText("Press 'R' to Restart", WIDTH / 2, HEIGHT / 2 + 25);
+                ctx.textAlign = "left";
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        loop();
+    </script>
+</body>
+</html>
