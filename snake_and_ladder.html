@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snakes and Ladders</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background-color: #121826;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #f1c40f;
+            margin-top: 0;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            font-size: 32px;
+        }
+
+        .main-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            align-items: flex-start;
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        .board-container {
+            position: relative;
+            background: #1e2736;
+            border: 4px solid #f1c40f;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .side-panel {
+            flex: 1;
+            min-width: 320px;
+            max-width: 420px;
+            background: #1a2332;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            border: 1px solid #2c3b52;
+        }
+
+        .mode-select {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            background: #253346;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn.active {
+            background: #e94560;
+            box-shadow: 0 0 10px rgba(233, 69, 96, 0.4);
+        }
+
+        .btn:hover:not(.active) {
+            background: #32445d;
+        }
+
+        .turn-indicator {
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            padding: 10px;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.05);
+        }
+
+        .p1-turn { color: #ff2a6d; border: 2px solid #ff2a6d; }
+        .p2-turn { color: #05d9e8; border: 2px solid #05d9e8; }
+
+        .dice-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin: 5px 0;
+        }
+
+        .dice {
+            width: 65px;
+            height: 65px;
+            background: #ffffff;
+            color: #111;
+            font-size: 38px;
+            font-weight: bold;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            border: 3px solid #ddd;
+        }
+
+        .roll-btn {
+            padding: 12px 30px;
+            font-size: 18px;
+            background: #f1c40f;
+            color: #111;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        }
+
+        .roll-btn:hover:not(:disabled) {
+            background: #d4ac0d;
+        }
+
+        .roll-btn:disabled {
+            background: #4a5568;
+            cursor: not-allowed;
+            color: #a0aec0;
+        }
+
+        .status-box {
+            background: #222e40;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            text-align: center;
+            border-left: 3px solid #05d9e8;
+        }
+
+        .events-feed-container {
+            background: #151d2a;
+            border: 1px solid #2e3e56;
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .events-feed-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #f1c40f;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .events-feed {
+            height: 120px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding-right: 5px;
+        }
+
+        /* Scrollbar Styling */
+        .events-feed::-webkit-scrollbar {
+            width: 5px;
+        }
+        .events-feed::-webkit-scrollbar-track {
+            background: #0d131d;
+        }
+        .events-feed::-webkit-scrollbar-thumb {
+            background: #2e3e56;
+            border-radius: 3px;
+        }
+
+        .event-item {
+            font-size: 12px;
+            padding: 6px 8px;
+            border-radius: 4px;
+            background: #1f2a3c;
+            border-left: 3px solid #a0aec0;
+            line-height: 1.4;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .event-item.snake { border-left-color: #e74c3c; background: rgba(231, 76, 60, 0.15); }
+        .event-item.ladder { border-left-color: #2ecc71; background: rgba(46, 204, 113, 0.15); }
+        .event-item.six { border-left-color: #f1c40f; background: rgba(241, 196, 15, 0.15); }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-3px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .instructions-box {
+            background: #1b2636;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            line-height: 1.4;
+            border-left: 4px solid #f1c40f;
+        }
+
+        .instructions-box h3 {
+            margin-top: 0;
+            margin-bottom: 6px;
+            color: #f1c40f;
+            font-size: 14px;
+        }
+
+        .instructions-box ul {
+            padding-left: 16px;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Snakes and Ladders</h1>
+
+<div class="main-container">
+    <div class="board-container">
+        <canvas id="boardCanvas" width="500" height="500"></canvas>
+    </div>
+
+    <div class="side-panel">
+        <div class="mode-select">
+            <button id="vsCompBtn" class="btn active" onclick="setMode('vsComp')">vs Computer</button>
+            <button id="vs2PBtn" class="btn" onclick="setMode('2P')">2 Players</button>
+        </div>
+
+        <div id="turnIndicator" class="turn-indicator p1-turn">
+            Player 1's Turn (Red)
+        </div>
+
+        <div class="dice-area">
+            <div id="dice" class="dice">⚄</div>
+            <button id="rollBtn" class="roll-btn" onclick="rollDice()">Roll Dice</button>
+        </div>
+
+        <div id="statusBox" class="status-box">
+            Game started! Player 1, roll the dice.
+        </div>
+
+        <!-- Side Event Feed for Major Events -->
+        <div class="events-feed-container">
+            <div class="events-feed-title">📜 Major Events Log</div>
+            <div id="eventsFeed" class="events-feed">
+                <div class="event-item">🎮 Game started. Good luck!</div>
+            </div>
+        </div>
+
+        <div class="instructions-box">
+            <h3>📖 Playing Instructions</h3>
+            <ul>
+                <li><strong>Objective:</strong> Reach square <strong>100</strong> first.</li>
+                <li><strong>Movement:</strong> Click <em>Roll Dice</em> to advance.</li>
+                <li><strong>🪜 Ladders:</strong> Climb named ladders to jump ahead.</li>
+                <li><strong>🐍 Snakes:</strong> Watch out for named snakes sliding you down.</li>
+                <li><strong>Rolling 6:</strong> Grants an extra bonus turn.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('boardCanvas');
+const ctx = canvas.getContext('2d');
+
+const boardSize = 10;
+const tileSize = canvas.width / boardSize;
+
+let gameMode = 'vsComp';
+let currentPlayer = 1;
+let isRolling = false;
+
+let playerPositions = { 1: 0, 2: 0 };
+
+// Named Snakes Definitions (Head -> Tail)
+const snakes = {
+    16: { tail: 6, name: "Baby Viper" },
+    47: { tail: 26, name: "Green Mamba" },
+    49: { tail: 11, name: "Sly Python" },
+    56: { tail: 53, name: "Little Adder" },
+    62: { tail: 19, name: "Red Cobra" },
+    64: { tail: 60, name: "Swamp Asp" },
+    87: { tail: 24, name: "Shadow King Cobra" },
+    93: { tail: 73, name: "Desert Rattlesnake" },
+    95: { tail: 75, name: "Forest Anaconda" },
+    98: { tail: 78, name: "Titanboa" }
+};
+
+// Named Ladders Definitions (Base -> Top)
+const ladders = {
+    1: { top: 38, name: "Grand Starter Ladder" },
+    4: { top: 14, name: "Short Bamboo Ladder" },
+    9: { top: 31, name: "Wooden Stepladder" },
+    21: { top: 42, name: "Rope Ladder" },
+    28: { top: 84, name: "Golden Skyway Ladder" },
+    36: { top: 44, name: "Iron Ladder" },
+    51: { top: 67, name: "Highland Ladder" },
+    71: { top: 91, name: "Starlight Ladder" },
+    80: { top: 100, name: "Victory Ladder" }
+};
+
+const diceFaces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+
+function getCoords(square) {
+    if (square <= 0) return { x: -30, y: canvas.height - 20 };
+    
+    let zeroBased = square - 1;
+    let row = Math.floor(zeroBased / 10);
+    let col = zeroBased % 10;
+
+    if (row % 2 === 1) {
+        col = 9 - col;
+    }
+
+    let x = col * tileSize + tileSize / 2;
+    let y = canvas.height - (row * tileSize + tileSize / 2);
+    return { x, y };
+}
+
+function logEvent(text, type = 'normal') {
+    const feed = document.getElementById('eventsFeed');
+    const item = document.createElement('div');
+    item.className = `event-item ${type}`;
+    item.innerHTML = text;
+    feed.insertBefore(item, feed.firstChild);
+}
+
+function drawBoard() {
+    // 1. Draw Board Grid
+    for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 10; col++) {
+            let squareNum = (row % 2 === 0) ? (row * 10 + col + 1) : (row * 10 + (9 - col) + 1);
+            let x = col * tileSize;
+            let y = canvas.height - ((row + 1) * tileSize);
+
+            ctx.fillStyle = (row + col) % 2 === 0 ? '#1f2b3e' : '#28374d';
+            ctx.fillRect(x, y, tileSize, tileSize);
+
+            ctx.strokeStyle = '#141d2b';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, tileSize, tileSize);
+
+            ctx.fillStyle = '#8a99ad';
+            ctx.font = 'bold 11px Arial';
+            ctx.fillText(squareNum, x + 4, y + 14);
+        }
+    }
+
+    // 2. Draw Realistic Ladders
+    for (let start in ladders) {
+        let top = ladders[start].top;
+        let p1 = getCoords(parseInt(start));
+        let p2 = getCoords(top);
+        drawRealisticLadder(p1, p2);
+    }
+
+    // 3. Draw Realistic Snakes
+    for (let head in snakes) {
+        let tail = snakes[head].tail;
+        let p1 = getCoords(parseInt(head));
+        let p2 = getCoords(tail);
+        drawRealisticSnake(p1, p2, parseInt(head));
+    }
+
+    // 4. Draw Player Tokens
+    drawPlayer(1, '#ff2a6d', -9);
+    drawPlayer(2, '#05d9e8', 9);
+}
+
+// Render Realistic Wooden Ladders
+function drawRealisticLadder(p1, p2) {
+    let dx = p2.x - p1.x;
+    let dy = p2.y - p1.y;
+    let angle = Math.atan2(dy, dx);
+    let dist = Math.hypot(dx, dy);
+
+    ctx.save();
+    ctx.translate(p1.x, p1.y);
+    ctx.rotate(angle);
+
+    const railOffset = 10;
+    const rungSpacing = 16;
+
+    // Outer Side Rails (Brown Wood)
+    ctx.strokeStyle = '#8B4513';
+    ctx.lineWidth = 4;
+    
+    // Left Rail
+    ctx.beginPath();
+    ctx.moveTo(0, -railOffset);
+    ctx.lineTo(dist, -railOffset);
+    ctx.stroke();
+
+    // Right Rail
+    ctx.beginPath();
+    ctx.moveTo(0, railOffset);
+    ctx.lineTo(dist, railOffset);
+    ctx.stroke();
+
+    // Wood Highlights
+    ctx.strokeStyle = '#D2691E';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -railOffset - 1);
+    ctx.lineTo(dist, -railOffset - 1);
+    ctx.moveTo(0, railOffset - 1);
+    ctx.lineTo(dist, railOffset - 1);
+    ctx.stroke();
+
+    // Horizontal Rungs
+    ctx.strokeStyle = '#cd853f';
+    ctx.lineWidth = 3;
+    for (let i = rungSpacing; i < dist - 5; i += rungSpacing) {
+        ctx.beginPath();
+        ctx.moveTo(i, -railOffset);
+        ctx.lineTo(i, railOffset);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+// Render Realistic Wavy Snakes
+function drawRealisticSnake(p1, p2, headNum) {
+    let dx = p2.x - p1.x;
+    let dy = p2.y - p1.y;
+    let dist = Math.hypot(dx, dy);
+    let angle = Math.atan2(dy, dx);
+
+    ctx.save();
+    ctx.translate(p1.x, p1.y);
+    ctx.rotate(angle);
+
+    // Color theme based on head square
+    let bodyColor = (headNum % 2 === 0) ? '#e74c3c' : '#27ae60';
+    let stripeColor = (headNum % 2 === 0) ? '#f1c40f' : '#2ecc71';
+
+    // Draw Serpentine Wavy Body
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    let waves = Math.max(3, Math.floor(dist / 30));
+    for (let i = 0; i <= dist; i += 5) {
+        let waveOffset = Math.sin((i / dist) * Math.PI * waves) * 12;
+        ctx.lineTo(i, waveOffset);
+    }
+
+    // Snake Body Outline & Fill
+    ctx.strokeStyle = bodyColor;
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    ctx.strokeStyle = stripeColor;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Snake Head
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.arc(0, 0, 7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Eyes
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(-2, -3, 2, 0, Math.PI * 2);
+    ctx.arc(-2, 3, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(-2, -3, 1, 0, Math.PI * 2);
+    ctx.arc(-2, 3, 1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Forked Red Tongue
+    ctx.strokeStyle = '#ff0000';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-7, 0);
+    ctx.lineTo(-12, 0);
+    ctx.lineTo(-15, -3);
+    ctx.moveTo(-12, 0);
+    ctx.lineTo(-15, 3);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function drawPlayer(playerNum, color, offset) {
+    let pos = playerPositions[playerNum];
+    if (pos <= 0) return;
+
+    let coords = getCoords(pos);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(coords.x + offset, coords.y + offset, 9, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+}
+
+function setMode(mode) {
+    gameMode = mode;
+    document.getElementById('vsCompBtn').classList.toggle('active', mode === 'vsComp');
+    document.getElementById('vs2PBtn').classList.toggle('active', mode === '2P');
+    resetGame();
+}
+
+function resetGame() {
+    playerPositions = { 1: 0, 2: 0 };
+    currentPlayer = 1;
+    isRolling = false;
+    document.getElementById('eventsFeed').innerHTML = '<div class="event-item">🎮 Game restarted!</div>';
+    updateUI("Game restarted. Player 1's turn.");
+    drawBoard();
+}
+
+function updateUI(message) {
+    const indicator = document.getElementById('turnIndicator');
+    const statusBox = document.getElementById('statusBox');
+
+    statusBox.innerText = message;
+
+    if (currentPlayer === 1) {
+        indicator.innerText = "Player 1's Turn (Red)";
+        indicator.className = "turn-indicator p1-turn";
+    } else {
+        indicator.innerText = gameMode === 'vsComp' ? "Computer's Turn (Blue)" : "Player 2's Turn (Blue)";
+        indicator.className = "turn-indicator p2-turn";
+    }
+}
+
+function rollDice() {
+    if (isRolling) return;
+    isRolling = true;
+    document.getElementById('rollBtn').disabled = true;
+
+    let rollCount = 0;
+    const diceEl = document.getElementById('dice');
+
+    const interval = setInterval(() => {
+        const randVal = Math.floor(Math.random() * 6) + 1;
+        diceEl.innerText = diceFaces[randVal - 1];
+        rollCount++;
+
+        if (rollCount > 10) {
+            clearInterval(interval);
+            const finalRoll = Math.floor(Math.random() * 6) + 1;
+            diceEl.innerText = diceFaces[finalRoll - 1];
+            processMove(finalRoll);
+        }
+    }, 40);
+}
+
+function processMove(roll) {
+    let currentPos = playerPositions[currentPlayer];
+    let targetPos = currentPos + roll;
+    let playerName = currentPlayer === 1 ? "Player 1" : (gameMode === 'vsComp' ? "Computer" : "Player 2");
+
+    // Event Logging for Roll 6
+    if (roll === 6) {
+        logEvent(`🎲 <strong>${playerName}</strong> rolled a 6! (Gets an extra turn)`, 'six');
+    }
+
+    if (targetPos > 100) {
+        updateUI(`${playerName} rolled a ${roll} but needs an exact roll to land on 100!`);
+        switchTurn(roll === 6);
+        return;
+    }
+
+    playerPositions[currentPlayer] = targetPos;
+    drawBoard();
+
+    let statusMsg = `${playerName} rolled a ${roll} and moved to square ${targetPos}.`;
+
+    // Check Ladder Encounter
+    if (ladders[targetPos]) {
+        let ladder = ladders[targetPos];
+        let newPos = ladder.top;
+        playerPositions[currentPlayer] = newPos;
+        statusMsg += ` 🪜 Climbed "${ladder.name}" to ${newPos}!`;
+        logEvent(`🪜 <strong>${playerName}</strong> climbed ladder <em>"${ladder.name}"</em> to square ${newPos}!`, 'ladder');
+    } 
+    // Check Snake Encounter
+    else if (snakes[targetPos]) {
+        let snake = snakes[targetPos];
+        let newPos = snake.tail;
+        playerPositions[currentPlayer] = newPos;
+        statusMsg += ` 🐍 Bitten by "${snake.name}" down to ${newPos}!`;
+        logEvent(`🐍 <strong>${playerName}</strong> was bitten by <em>"${snake.name}"</em> and fell to square ${newPos}!`, 'snake');
+    }
+
+    drawBoard();
+
+    // Check Win Condition
+    if (playerPositions[currentPlayer] === 100) {
+        updateUI(`🎉 ${playerName} reached square 100 and WON!`);
+        logEvent(`🏆 <strong>${playerName}</strong> WON THE GAME! 🎉`, 'six');
+        document.getElementById('rollBtn').disabled = true;
+        return;
+    }
+
+    switchTurn(roll === 6);
+}
+
+function switchTurn(rolledSix) {
+    isRolling = false;
+
+    if (rolledSix) {
+        let playerName = currentPlayer === 1 ? "Player 1" : (gameMode === 'vsComp' ? "Computer" : "Player 2");
+        updateUI(`${playerName} rolled a 6! Extra turn.`);
+    } else {
+        currentPlayer = currentPlayer === 1 ? 2 : 1;
+        let playerName = currentPlayer === 1 ? "Player 1" : (gameMode === 'vsComp' ? "Computer" : "Player 2");
+        updateUI(`It is now ${playerName}'s turn.`);
+    }
+
+    // AI Computer Turn
+    if (currentPlayer === 2 && gameMode === 'vsComp') {
+        document.getElementById('rollBtn').disabled = true;
+        setTimeout(() => {
+            rollDice();
+        }, 1100);
+    } else {
+        document.getElementById('rollBtn').disabled = false;
+    }
+}
+
+// Initial Board Render
+drawBoard();
+</script>
+
+</body>
+</html>
