@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Egg Catcher Game</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .game-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #2b2b2b;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+        }
+
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            letter-spacing: 1px;
+        }
+
+        .score-box { color: #4CAF50; }
+        .lives-box { color: #FF5252; }
+
+        .canvas-container {
+            position: relative;
+        }
+
+        canvas {
+            background: linear-gradient(to bottom, #87CEEB 0%, #E0F6FF 75%, #7EC850 75%, #559922 100%);
+            border: 3px solid #ffffff;
+            border-radius: 8px;
+            display: block;
+            cursor: none;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #ffffff;
+            text-align: center;
+        }
+
+        .overlay h1 {
+            font-size: 38px;
+            margin-bottom: 10px;
+            color: #FFD700;
+        }
+
+        .overlay p {
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #45a049;
+        }
+
+        .controls-hint {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #bbbbbb;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-wrapper">
+    <div class="header">
+        <div class="score-box">SCORE: <span id="score">0</span></div>
+        <div class="lives-box">LIVES: <span id="lives">3</span></div>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="gameCanvas" width="480" height="520"></canvas>
+        <div id="startOverlay" class="overlay">
+            <h1>Egg Catcher</h1>
+            <p>Catch as many falling eggs as you can!</p>
+            <button class="btn" onclick="startGame()">Play Game</button>
+        </div>
+        <div id="gameOverOverlay" class="overlay" style="display: none;">
+            <h1 style="color: #FF5252;">Game Over</h1>
+            <p>Final Score: <span id="finalScore">0</span></p>
+            <button class="btn" onclick="startGame()">Try Again</button>
+        </div>
+    </div>
+
+    <div class="controls-hint">
+        Move <strong>Mouse</strong> or use <strong>Left/Right Arrows</strong> to move the basket.
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const scoreEl = document.getElementById('score');
+const livesEl = document.getElementById('lives');
+const finalScoreEl = document.getElementById('finalScore');
+const startOverlay = document.getElementById('startOverlay');
+const gameOverOverlay = document.getElementById('gameOverOverlay');
+
+// Game Parameters
+let score = 0;
+let lives = 3;
+let isGameRunning = false;
+let animationId;
+
+// Basket
+const basket = {
+    width: 80,
+    height: 40,
+    x: (canvas.width - 80) / 2,
+    y: canvas.height - 50,
+    speed: 7,
+    dx: 0
+};
+
+// Eggs array
+let eggs = [];
+let eggSpawnRate = 90; // Frame interval
+let frameCount = 0;
+
+// Golden Egg probability
+const GOLDEN_EGG_CHANCE = 0.15;
+
+// Controls setup
+let rightPressed = false;
+let leftPressed = false;
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') rightPressed = true;
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') leftPressed = true;
+});
+
+document.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') rightPressed = false;
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') leftPressed = false;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    basket.x = mouseX - basket.width / 2;
+});
+
+// Egg Factory
+function spawnEgg() {
+    const isGolden = Math.random() < GOLDEN_EGG_CHANCE;
+    eggs.push({
+        x: Math.random() * (canvas.width - 30) + 15,
+        y: -20,
+        radiusX: 10,
+        radiusY: 14,
+        speed: 2.5 + Math.random() * 1.5 + (score * 0.05), // Dynamic difficulty speedup
+        isGolden: isGolden,
+        broken: false,
+        breakTimer: 0
+    });
+}
+
+function startGame() {
+    score = 0;
+    lives = 3;
+    eggs = [];
+    frameCount = 0;
+    isGameRunning = true;
+    basket.x = (canvas.width - basket.width) / 2;
+    
+    scoreEl.innerText = score;
+    livesEl.innerText = lives;
+
+    startOverlay.style.display = 'none';
+    gameOverOverlay.style.display = 'none';
+
+    if (animationId) cancelAnimationFrame(animationId);
+    gameLoop();
+}
+
+function endGame() {
+    isGameRunning = false;
+    finalScoreEl.innerText = score;
+    gameOverOverlay.style.display = 'flex';
+}
+
+function update() {
+    // Move Basket via Keyboard
+    if (rightPressed && basket.x < canvas.width - basket.width) {
+        basket.x += basket.speed;
+    } else if (leftPressed && basket.x > 0) {
+        basket.x -= basket.speed;
+    }
+
+    // Keep Basket within limits
+    if (basket.x < 0) basket.x = 0;
+    if (basket.x > canvas.width - basket.width) basket.x = canvas.width - basket.width;
+
+    // Spawn Eggs
+    frameCount++;
+    if (frameCount % Math.max(30, eggSpawnRate - Math.floor(score / 5)) === 0) {
+        spawnEgg();
+    }
+
+    // Update Eggs Position & Collision Detection
+    for (let i = eggs.length - 1; i >= 0; i--) {
+        let egg = eggs[i];
+
+        if (egg.broken) {
+            egg.breakTimer++;
+            if (egg.breakTimer > 20) {
+                eggs.splice(i, 1);
+            }
+            continue;
+        }
+
+        egg.y += egg.speed;
+
+        // Catching Egg in Basket
+        if (
+            egg.y + egg.radiusY >= basket.y &&
+            egg.y - egg.radiusY <= basket.y + basket.height &&
+            egg.x >= basket.x &&
+            egg.x <= basket.x + basket.width
+        ) {
+            score += egg.isGolden ? 5 : 1;
+            scoreEl.innerText = score;
+            eggs.splice(i, 1);
+            continue;
+        }
+
+        // Egg hits the floor
+        if (egg.y + egg.radiusY >= canvas.height - 15) {
+            egg.broken = true;
+            lives--;
+            livesEl.innerText = lives;
+
+            if (lives <= 0) {
+                endGame();
+                return;
+            }
+        }
+    }
+}
+
+function drawBasket() {
+    // Woven Basket Body
+    ctx.fillStyle = '#8B4513';
+    ctx.beginPath();
+    ctx.moveTo(basket.x, basket.y);
+    ctx.lineTo(basket.x + basket.width, basket.y);
+    ctx.lineTo(basket.x + basket.width - 10, basket.y + basket.height);
+    ctx.lineTo(basket.x + 10, basket.y + basket.height);
+    ctx.closePath();
+    ctx.fill();
+
+    // Basket Rim
+    ctx.fillStyle = '#A0522D';
+    ctx.fillRect(basket.x - 2, basket.y - 4, basket.width + 4, 6);
+
+    // Weave Pattern Detail
+    ctx.strokeStyle = '#6A3805';
+    ctx.lineWidth = 2;
+    for (let i = 10; i < basket.width; i += 15) {
+        ctx.beginPath();
+        ctx.moveTo(basket.x + i, basket.y);
+        ctx.lineTo(basket.x + i - 3, basket.y + basket.height);
+        ctx.stroke();
+    }
+}
+
+function drawEgg(egg) {
+    if (egg.broken) {
+        // Splat on ground
+        ctx.fillStyle = '#FFD700'; // Yolk
+        ctx.beginPath();
+        ctx.arc(egg.x, canvas.height - 10, 10, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#FFFFFF'; // Shell bits
+        ctx.beginPath();
+        ctx.arc(egg.x - 8, canvas.height - 8, 4, 0, Math.PI * 2);
+        ctx.arc(egg.x + 8, canvas.height - 8, 4, 0, Math.PI * 2);
+        ctx.fill();
+        return;
+    }
+
+    // Gradient styling for 3D sphere illusion
+    let gradient = ctx.createRadialGradient(
+        egg.x - 3, egg.y - 4, 2,
+        egg.x, egg.y, egg.radiusY
+    );
+
+    if (egg.isGolden) {
+        gradient.addColorStop(0, '#FFFFE0');
+        gradient.addColorStop(0.5, '#FFD700');
+        gradient.addColorStop(1, '#B8860B');
+    } else {
+        gradient.addColorStop(0, '#FFFFFF');
+        gradient.addColorStop(0.7, '#F5E6D3');
+        gradient.addColorStop(1, '#D2B48C');
+    }
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.ellipse(egg.x, egg.y, egg.radiusX, egg.radiusY, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Subtle outline
+    ctx.strokeStyle = egg.isGolden ? '#DAA520' : '#C4A482';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+}
+
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Hen Coop Beam / Top Bar
+    ctx.fillStyle = '#654321';
+    ctx.fillRect(0, 0, canvas.width, 15);
+
+    // Render Eggs
+    eggs.forEach(drawEgg);
+
+    // Render Basket
+    drawBasket();
+}
+
+function gameLoop() {
+    if (!isGameRunning) return;
+
+    update();
+    render();
+
+    if (isGameRunning) {
+        animationId = requestAnimationFrame(gameLoop);
+    }
+}
+</script>
+
+</body>
+</html>
